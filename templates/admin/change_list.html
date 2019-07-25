@@ -37,7 +37,22 @@
 
 {% block coltype %}flex{% endblock %}
 
+
+
 {% block content %}
+    <div> {% if show_back %}
+                  <a class="button" href="/deviceInfo/{{ instance_id }}" id="h0">{% trans "设备清单" %}</a>
+                  <a class="button" href="/outSource/{{instance_id}}" id="h1">{% trans "其他费用" %}</a>
+                  <a class="button" href="/devicesChangeInfo/{{instance_id}}" id="h2">{% trans "设备变更表" %}</a>
+                  <a class="button" href="/StockInfo/{{instance_id}}" id="h3">{% trans "材料领用表" %}</a>
+                  <a class="button" href="/FinalReportInfo/{{ instance_id }}" id="h1">{% trans "竣工报告" %}</a>
+                  <a class="button" href="/EvaluationInfo/{{instance_id}}" id="h6">{% trans "项目经理考核表" %}</a>
+                  <a class="button" href="/HRInfo/{{instance_id}}" id="h7">{% trans "工时表" %}</a>
+                  <a class="button" href="/devicesFinalInfo/{{instance_id}}" id="h8">{% trans "设备信息表" %}</a>
+                  <a class="button" href="/admin/basedata/project/{{ instance_id }}/change">{% trans "回到项目(不会保存)" %}</a>
+                  <p>  </p>
+              {% endif %}</div>
+
   <div id="content-main">
     {% block object-tools %}
         <ul class="object-tools">
@@ -100,17 +115,7 @@
            {% if show_all %}
            <a class="button" href={{ href }}>{% trans "显示全部记录" %}</a>
           {% endif %}
-              {% if show_back %}
-                  <a class="button" href="/deviceInfo/{{ instance_id }}" id="h0">{% trans "设备清单" %}</a>
-                  <a class="button" href="/outSource/{{instance_id}}" id="h1">{% trans "其他费用" %}</a>
-                  <a class="button" href="/devicesChangeInfo/{{instance_id}}" id="h2">{% trans "设备变更表" %}</a>
-                  <a class="button" href="/StockInfo/{{instance_id}}" id="h3">{% trans "材料领用表" %}</a>
-                  <a class="button" href="/FinalReportInfo/{{ instance_id }}" id="h1">{% trans "竣工报告" %}</a>
-                  <a class="button" href="/EvaluationInfo/{{instance_id}}" id="h6">{% trans "项目经理考核表" %}</a>
-                  <a class="button" href="/HRInfo/{{instance_id}}" id="h7">{% trans "工时表" %}</a>
-                  <a class="button" href="/devicesFinalInfo/{{instance_id}}" id="h8">{% trans "设备信息表" %}</a>
-                  <a class="button" href="/admin/basedata/project/{{ instance_id }}/change">{% trans "回到项目(不会保存)" %}</a>
-              {% endif %}
+
           {% if can_submit %}
            <a class="button" href="/next/{{type}}/{{ instance_id }}" id="h0">{% trans "确认并开始下一流程" %}</a>
           {% endif %}

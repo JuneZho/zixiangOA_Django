@@ -2,17 +2,15 @@
 # coding = utf-8
 from django.contrib import admin
 from basedata import models as mymodels
-from zixiangERP import view
 from django.contrib import messages
-from django.db import models
 from django.http import HttpResponseRedirect
 from zixiangERP.settings import BASE_DIR
 import xlrd
 from django.contrib.admin.templatetags.admin_modify import register, submit_row as original_submit_row
-from django.forms import widgets
+from django.forms import widgets,FileField,Field,Widget,CharField,TextInput
+from django.forms.utils import flatatt
 
 from django.contrib.admin import AdminSite
-
 
 
 class MyAdminSite(AdminSite):
@@ -81,14 +79,15 @@ def make_number(objects):
         model.save()
 
 class ProjectAdmin(admin.ModelAdmin):
+    starter = False
     fieldsets = (
         ("基础信息", {'fields': ['begin', 'starter', 'name', 'contract', 'total_price','kaipiao']}),
         ("客户及付款人信息", {
             'fields': [('cusname', 'cusaddr'), ('recname', 'recaddr'), ('receiver', 'receiverdep'),
                                  ('receivertele', 'receiverphone'), ('payer', 'payerdep'), ('payertele', 'payerphone')]}),
         ("其他", {'fields': [
-            ('end', 'deliver_time'), 'manager', 'description', 'associated_file',
-                           ('niehe_hour', 'total_hour', 'hour_cost'), ('total_out', 'total_mat', 'total_money'),
+            ('end', 'deliver_time'), 'manager', 'description', 'associated_file','reward',
+                           ('niehe_hour', 'total_hour', 'hour_cost'),('total_out', 'total_mat', 'total_money'),
                            'workflow_node','comment']}),
 
         )
@@ -100,35 +99,48 @@ class ProjectAdmin(admin.ModelAdmin):
             return qs.filter(id = request.user.recent_pro)
         return qs
 
-    def _changeform_view(self, request, object_id, form_url, extra_context):
 
-        if "_confirm" in request.POST:
-            ModelForm = self.get_form(request)
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if self.starter:
+            return super(ProjectAdmin, self).formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name == 'cusname':
+            kwargs['widget']  = TextInput(attrs={'readonly': 'readonly','size': 30})
 
-            form = ModelForm(request.POST, request.FILES)
+        if db_field.name == 'cusaddr':
+            kwargs['widget']  = TextInput(attrs={'readonly': 'readonly','size': 30})
 
-            form_validated = form.is_valid()
+        if db_field.name == 'recname':
+            kwargs['widget']  = TextInput(attrs={'readonly': 'readonly','size': 30})
 
-            if form_validated:
-                new_object = form.save(commit=False)
+        if db_field.name == 'recaddr':
+            kwargs['widget']  = TextInput(attrs={'readonly': 'readonly','size': 30})
 
-                context = {
+        if db_field.name == 'receiver':
+            kwargs['widget']  = TextInput(attrs={'readonly': 'readonly','size': 30})
 
-                    **self.admin_site.each_context(request),
+        if db_field.name == 'receiverdep':
+            kwargs['widget']  = TextInput(attrs={'readonly': 'readonly','size': 30})
 
-                    'obj': new_object,
+        if db_field.name == 'receivertele':
+            kwargs['widget']  = TextInput(attrs={'readonly': 'readonly','size': 30})
 
-                    'opts': self.model._meta,
+        if db_field.name == 'receiverphone':
+            kwargs['widget']  = TextInput(attrs={'readonly': 'readonly','size': 30})
 
-                    'form': form,
+        if db_field.name == 'payer':
+            kwargs['widget']  = TextInput(attrs={'readonly': 'readonly','size': 30})
 
-                }
-                from django.template.response import TemplateResponse
-                return TemplateResponse(
+        if db_field.name == 'payerdep':
+            kwargs['widget']  = TextInput(attrs={'readonly': 'readonly','size': 30})
 
-                    request, 'admin/basedata/form_confirmation.html', context)
+        if db_field.name == 'payerphone':
+                kwargs['widget'] = TextInput(attrs={'readonly': 'readonly', 'size': 30})
 
-        return super()._changeform_view(request, object_id, form_url, extra_context)
+        if db_field.name == 'payertele':
+            kwargs['widget']  = TextInput(attrs={'readonly': 'readonly','size': 30})
+
+        return  super(ProjectAdmin,self).formfield_for_dbfield(db_field, request, **kwargs)
+
 
     def get_changeform_initial_data(self, request):
         return {'starter': request.user}
@@ -136,41 +148,39 @@ class ProjectAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request, obj=None):
 
         if obj==None: ##adding
+            self.starter = True
             return ['workflow_node', 'total_price', 'manager', 'active', 'niehe_hour', 'total_hour', 'total_mat',
-                    'total_money','hour_cost','total_out']
+                    'total_money','hour_cost','total_out','reward']
         elif request.user.title ==4:
-            return ['active','begin','starter','name','cusname',
-                    'cusaddr','recname','recaddr','receiver',
-                    'receiverdep','receiverphone','receivertele',
-                    'payer','payerdep','payerphone','payertele','total_price','kaipiao','contract','deliver_time',
-                    'description','associated_file','total_hour','total_mat','total_money','niehe_hour','workflow_node','hour_cost','total_out']
+            return ['active','begin','starter','name','total_price','kaipiao','contract','deliver_time',
+                    'description','associated_file','total_hour','total_mat','total_money','workflow_node','hour_cost','total_out','reward']
         elif request.user ==obj.starter:
+            self.starter = True
             return ['workflow_node', 'total_price', 'manager', 'active', 'niehe_hour', 'total_hour', 'total_mat',
-                    'total_money','hour_cost','total_out']
+                    'total_money','hour_cost','total_out','reward']
         elif request.user == obj.manager:
-            return ['active', 'begin', 'starter', 'name', 'cusname',
-                    'cusaddr', 'recname', 'recaddr', 'receiver',
-                    'receiverdep', 'receiverphone', 'receivertele',
-                    'payer', 'payerdep', 'payerphone', 'payertele', 'total_price', 'kaipiao','deliver_time','manager',
-                    'description', 'associated_file', 'total_hour', 'total_mat', 'total_money','niehe_hour','workflow_node','end','hour_cost','contract','total_out']
+            return ['active', 'begin', 'starter', 'name', 'total_price', 'kaipiao','deliver_time','manager',
+                    'description', 'associated_file', 'total_hour', 'total_mat', 'total_money','niehe_hour','workflow_node','end','hour_cost','contract','total_out','reward']
         else:
 
-            return  ['active', 'begin', 'starter', 'name', 'cusname',
-                    'cusaddr', 'recname', 'recaddr', 'receiver',
-                    'receiverdep', 'receiverphone', 'receivertele',
-                    'payer', 'payerdep', 'payerphone', 'payertele', 'total_price', 'kaipiao','deliver_time','manager',
-                    'description', 'associated_file', 'total_hour', 'total_mat', 'total_money','niehe_hour','workflow_node','end','hour_cost','contract','total_out']
+            return  ['active', 'begin', 'starter', 'name',
+                    #'cusname','cusaddr', 'recname', 'recaddr', 'receiver',
+                    #'receiverdep', 'receiverphone', 'receivertele',
+                    #'payer', 'payerdep', 'payerphone', 'payertele',
+                    'total_price', 'kaipiao','deliver_time','manager',
+                    'description', 'associated_file', 'total_hour', 'total_mat', 'total_money','niehe_hour','workflow_node','end','hour_cost','contract','total_out','reward']
+
 
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
-        """
 
-        :param request:
-        :param object_id:
-        :param form_url:
-        :param extra_context:
-        :return:
-        """
+        show_return = False
+        if object_id != None:
+            obj = Project.objects.get(id=object_id)
+            if obj.workflow_node == 0:
+                show_return = False
+            elif sub_can_return(obj, request.user):
+                show_return = True
 
         '''store recent project'''
         request.user.recent_pro = object_id
@@ -204,6 +214,7 @@ class ProjectAdmin(admin.ModelAdmin):
 
         extra_context = extra_context or {}
         ctx = dict(
+            show_return = show_return,
             show_workflow_line = show_workflow_line,
             can_edit=can_edit,
             instance_id=object_id,
@@ -218,6 +229,12 @@ class ProjectAdmin(admin.ModelAdmin):
 
 
     def save_model(self, request, obj, form, change):
+
+        if "_return" in request.POST:
+            TodoList.objects.filter(project=obj, content_type=1).delete()
+            obj.go_back()
+            self.message_user(request,"撤回成功")
+            return
 
         msg = ''
         if change:
@@ -251,7 +268,7 @@ class ProjectAdmin(admin.ModelAdmin):
 
             '''project to next'''
 
-            if "_next" in request.POST:
+            if "_confirm" in request.POST:
                 '''project workflow submit requirment'''
 
                 if request.user.title == 4:
@@ -283,19 +300,17 @@ class ProjectAdmin(admin.ModelAdmin):
 
 
 
-                todo_list = TodoList.objects.filter(project=obj, user=request.user,content_type=1)
-                if todo_list.count() > 0:
-                    TodoList.objects.filter(user=request.user,  project=obj,content_type=1).delete()
-                    obj.to_next()
-                    History.objects.create(project=obj, user=request.user, pro_type=1)
-                    if obj.WORK_FLOW_NODE[obj.workflow_node][1] != '普通员工':
-                        msg += "提交成功，进入下一工作流 "+obj.WORK_FLOW_NODE[obj.workflow_node][1]
-                    else:
+                TodoList.objects.filter(user=request.user,  project=obj,content_type=1).delete()
+                obj.to_next()
+                History.objects.create(project=obj, user=request.user, pro_type=1,memo="同意")
+                if obj.WORK_FLOW_NODE[obj.workflow_node][1] != '普通员工':
+                    msg += "提交成功，进入下一工作流 "+obj.WORK_FLOW_NODE[obj.workflow_node][1]
+                else:
 
-                        msg += "提交成功，进入下一工作流 项目经理"+obj.manager.first_name+obj.manager.last_name
+                    msg += "提交成功，进入下一工作流 项目经理"+obj.manager.first_name+obj.manager.last_name
 
 
-                    self.message_user(request, msg)
+                self.message_user(request, msg)
 
 
         else:
@@ -339,17 +354,17 @@ class ProjectAdmin(admin.ModelAdmin):
             obj.active = False
             obj.name = obj.name + " 由合同签约人终止"
             TodoList.objects.filter(user=request.user, project=obj,content_type=1).delete()
-            History.objects.create(project=obj, user=request.user, pro_type=3)
+            History.objects.create(project=obj, user=request.user, pro_type=3,memo="反对")
             return
         else:
 
             TodoList.objects.filter(user=request.user, project=obj,content_type=1).delete()
             obj.go_back()
-            History.objects.create(project=obj, user=request.user, pro_type=2)
+            History.objects.create(project=obj, user=request.user, pro_type=2,memo="反对")
             self.message_user(request, "已反对，回到上一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
 
     def response_change(self, request, obj):
-        return HttpResponseRedirect('/admin/basedata/todolist')
+        return HttpResponseRedirect(request.path)
     def response_add(self, request, obj):
         return HttpResponseRedirect('/admin/basedata/todolist')
 
@@ -389,6 +404,7 @@ class OutsourceAdmin(admin.ModelAdmin):
     list_display = ['myname', 'begin_time', 'fuzeren', 'end_time', 'total_price']
 
     def get_readonly_fields(self, request, obj=None):
+        self.fields = ['project_info', 'myname', 'begin_time', 'end_time', 'fuzeren','price', 'total_price','description','associated_file','recom','workflow_node']
         if request.user.title ==4:
             return ['total_price','workflow_node','project_info','agreed']
         else:
@@ -416,12 +432,16 @@ class OutsourceAdmin(admin.ModelAdmin):
         show_save_and_continue = False
         show_delete_link = False
         show_submit_button = False
-        pro = Project.objects.get(id = request.user.recent_pro)
-        curuser = get_edible_user(pro)
-        if curuser.title == 4:
-            '''到达工程经理'''
-            curuser = get_edible_user(Outsource.objects.get(id = object_id))
-            if curuser == request.user:
+
+        curuser = get_edible_user(Outsource.objects.get(id = object_id))
+        if curuser == request.user:
+            if curuser.title == 4:
+                '''工程经理'''
+                show_submit_button = True
+                show_save = True
+                show_delete_link = False
+                show_save_and_continue = True
+            else:
                 show_submit_button = True
                 show_save = True
                 show_delete_link = True
@@ -429,9 +449,6 @@ class OutsourceAdmin(admin.ModelAdmin):
 
 
         extra_context = extra_context or {}
-
-        if request.user == Project.objects.get(id = object_id).manager:
-            show_delete_link = False
         '''WARNING: check for the user to show save'''
         ctx = dict(
             show_return= show_return,
@@ -442,7 +459,7 @@ class OutsourceAdmin(admin.ModelAdmin):
             show_delete_link=show_delete_link,
             show_save=show_save,
             show_back = True,
-            instance_id = request.user.recent_pro,
+            instance_id = obj.project_info.id,
             show_workflow_line = True
 
         )
@@ -456,8 +473,12 @@ class OutsourceAdmin(admin.ModelAdmin):
 
         obj.save()
         '''update info'''
+        if "_return" in request.POST:
+            TodoList.objects.filter(project=obj.project_info, content_type=2).delete()
+            obj.go_back()
+            return
+
         if request.user.title == 4:
-            self.message_user(request, "工作流内的修改")
 
             obj.save()
         if "_confirm" in request.POST:
@@ -465,8 +486,9 @@ class OutsourceAdmin(admin.ModelAdmin):
             self.message_user(request, "提交成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
 
 
+
+
     def delete_model(self, request, obj):
-        pro = obj.project_info
         if request.user.title == 4:
             self.message_user(request, "填写人无法反对")
         else:
@@ -475,7 +497,12 @@ class OutsourceAdmin(admin.ModelAdmin):
             self.message_user(request, "反对成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
 
 
+
     def response_change(self, request, obj):
+
+        if "_return" in request.POST:
+
+            return HttpResponseRedirect(request.path)
 
         items = Outsource_items.objects.filter(outsource_info=obj)
         total = 0
@@ -521,35 +548,7 @@ class Outsource_itemsAdmin(admin.ModelAdmin):
         os = Outsource.objects.get(project_info= pro)
         return qs.filter(outsource_info=os)
 
-    def _changeform_view(self, request, object_id, form_url, extra_context):
 
-        if "_confirm" in request.POST:
-            ModelForm = self.get_form(request)
-
-            form = ModelForm(request.POST, request.FILES)
-
-            form_validated = form.is_valid()
-
-            if form_validated:
-                new_object = form.save(commit=False)
-
-                context = {
-
-                    **self.admin_site.each_context(request),
-
-                    'obj': new_object,
-
-                    'opts': self.model._meta,
-
-                    'form': form,
-
-                }
-                from django.template.response import TemplateResponse
-                return TemplateResponse(
-
-                    request, 'admin/basedata/form_confirmation.html', context)
-
-        return super()._changeform_view(request, object_id, form_url, extra_context)
 
     def changelist_view(self, request, extra_context=None):
         if request.user.recent_pro != 0:
@@ -883,23 +882,30 @@ class device_logAdmin(admin.ModelAdmin):
         return super(device_logAdmin,self).formfield_for_manytomany(db_field,request,**kwargs)
     def has_add_permission(self, request):
         try:
-            return request.user == Project.objects.get(id=request.user.recent_pro).starter
+            if request.user == Project.objects.get(id=request.user.recent_pro).starter:
+
+                # can only add another when all other are agreed
+                return len(TodoList.objects.filter(project=Project.objects.get(id=request.user.recent_pro),
+                                                   content_type=3)) == 0
+
         except Exception as e:
             return False
-
+        return False
 
 
     def get_changeform_initial_data(self, request):
         ds = Device_changelog.objects.filter(project_info = Project.objects.get(id=request.user.recent_pro))
-        "slow"
+
         return {'thisid': len(ds)+1}
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+
         show_return = False
-        obj = Device_changelog.objects.get(id=object_id)
-        if obj.workflow_node == 0:
-            show_return = False
-        elif sub_can_return(obj, request.user):
-            show_return = True
+        if object_id != None:
+            obj = Device_changelog.objects.get(id=object_id)
+            if obj.workflow_node == 0:
+                show_return = False
+            elif sub_can_return(obj, request.user):
+                show_return = True
         self.readonly_fields = ['agreed', 'workflow_node', 'total_price'];
         self.exclude = ['project_info']
         show_delete = False
@@ -934,8 +940,10 @@ class device_logAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
         ctx = dict(
-
+            show_back = True,
             action_form=False,
+
+            instance_id=request.user.recent_pro
         )
 
         extra_context.update(ctx)
@@ -959,6 +967,10 @@ class device_logAdmin(admin.ModelAdmin):
         self.message_user(request, "成功")
 
     def save_model(self, request, obj, form, change):
+        if "_return" in request.POST:
+            TodoList.objects.filter(project=obj.project_info, content_type=3).delete()
+            obj.go_back()
+            return
         obj.project_info =Project.objects.get(id=request.user.recent_pro)
 
         "add the device"
@@ -1017,7 +1029,9 @@ class device_logAdmin(admin.ModelAdmin):
 
 
     def response_change(self, request, obj):
+        if "_return" in request.POST:
 
+            return HttpResponseRedirect(request.path)
         total = 0
         cs = Device_change.objects.filter(change_log=obj)
         for c in cs:
@@ -1338,6 +1352,11 @@ class DeviceFinalFormAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
 
+        if "_return" in request.POST:
+            TodoList.objects.filter(project=obj.project_info, content_type=8).delete()
+            obj.go_back()
+            return
+
         "add the device"
         if request.user == obj.project_info.manager:
             for d in form.cleaned_data['device']:
@@ -1400,6 +1419,8 @@ class DeviceFinalFormAdmin(admin.ModelAdmin):
         self.message_user(request, "反对成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
 
     def response_change(self, request, obj):
+        if "_return" in request.POST:
+            return HttpResponseRedirect(request.path)
 
         dfs = Device_final.objects.filter(name = '', form = obj)
         for ds in dfs:
@@ -1428,14 +1449,6 @@ class Device_finalAdmin(admin.ModelAdmin):
         return ['agreed','workflow_node']
 
 
-    def get_queryset(self, request):
-        pros = ContentType.objects.get(app_label='basedata', model='project')
-        try:
-            pro = pros.model_class().objects.get(id=request.user.recent_pro)
-        except Exception as e:
-            return super(Device_finalAdmin, self).get_queryset(request)
-        qs = super(Device_finalAdmin, self).get_queryset(request)
-        return qs.filter(work_report=work_report.objects.get(project_info_id = request.user.recent_pro))
 
     def changelist_view(self, request, extra_context=None):
         id = request.user.recent_pro
@@ -1560,15 +1573,20 @@ class work_recordAdmin(admin.ModelAdmin):
         return qs.filter(project_info=pro)
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         show_return = False
-        obj = work_report.objects.get(id=object_id)
-        if obj.workflow_node == 0:
-            show_return = False
-        elif sub_can_return(obj, request.user):
-            show_return = True
+        if object_id != None:
+            obj = work_report.objects.get(id=object_id)
+            if obj.workflow_node == 0:
+                show_return = False
+            elif sub_can_return(obj, request.user):
+                show_return = True
         show_submit_button = False
         show_save_and_continue = False
         if object_id == None: #adding
-            if request.user == Project.objects.get(id = request.user.recent_pro).manager:
+            pro = Project.objects.get(id = request.user.recent_pro)
+            if len(TodoList.objects.filter(project=pro, content_type=5)) != 0:
+                show_save_and_continue = False
+                show_submit_button = True
+            elif request.user == pro.manager:
                 show_submit_button = True
                 show_save_and_continue = True
         else:
@@ -1597,15 +1615,28 @@ class work_recordAdmin(admin.ModelAdmin):
         extra_context = extra_context or {}
         ctx = dict(
             show_all=True,
-
+            instance_id=request.user.recent_pro,
+            show_back=True,
             action_form=False,
             href = '/admin/basedata/work_hour/'
         )
 
         extra_context.update(ctx)
         return super(work_recordAdmin, self).changelist_view(request, extra_context)
+    def has_add_permission(self, request):
+
+        #can only add another when all other are agreed
+        try:
+            return len(TodoList.objects.filter(project=Project.objects.get(id = request.user.recent_pro), content_type=5)) == 0
+        except Exception:
+            return False
 
     def save_model(self, request, obj, form, change):
+
+        if "_return" in request.POST:
+            TodoList.objects.filter(project=obj.project_info, content_type=5).delete()
+            obj.go_back()
+            return
 
         obj.project_info = Project.objects.get(id = request.user.recent_pro)
         obj.save()
@@ -1615,11 +1646,13 @@ class work_recordAdmin(admin.ModelAdmin):
             self.message_user(request, "提交成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
 
     def delete_model(self, request, obj):
+        obj.save()
         to_next(obj, 2, request.user, "反对了工时表格", 5, False)
         self.message_user(request, "反对成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
 
 
     def response_change(self, request, obj):
+
         total = 0
         dict = {}
         for wh in work_hour.objects.filter(work_report = obj):
@@ -1669,10 +1702,10 @@ class work_recordAdmin(admin.ModelAdmin):
         obj.note = note
         obj.save()
 
-        return HttpResponseRedirect(request.path)
+        return HttpResponseRedirect('/admin/basedata/work_report')
 
     def response_delete(self, request, obj_display, obj_id):
-        return HttpResponseRedirect('/admin/')
+        return HttpResponseRedirect('/admin/basedata/work_report')
 
 
 
@@ -1788,7 +1821,6 @@ class Finish_reportAdmin(admin.ModelAdmin):
             show_return = True
         self.exclude = ['project_info']
         show_save_and_continue = False
-        show_submit_button = False
         show_save = False
         show_delete_link = False
         extra_context = extra_context or {}
@@ -1814,6 +1846,12 @@ class Finish_reportAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
 
+        if "_return" in request.POST:
+            TodoList.objects.filter(project=obj.project_info, content_type=6).delete()
+            obj.go_back()
+            return
+
+
         obj.save()
         if "_confirm" in request.POST:
             to_next(obj, 1, request.user, "提交了竣工报告表格", 6)
@@ -1825,9 +1863,12 @@ class Finish_reportAdmin(admin.ModelAdmin):
 
     def response_change(self, request, obj):
 
-        return HttpResponseRedirect('/admin/basedata/project/'+str(obj.project_info.id)+'/change')
+        if "_return" in request.POST:
+            return HttpResponseRedirect(request.path)
+        return HttpResponseRedirect(request.path)
 
     def response_add(self, request, obj):
+
         return HttpResponseRedirect('/admin/')
 
     def response_delete(self, request, obj_display, obj_id):
@@ -1869,6 +1910,12 @@ class feedback_formAdmin(admin.ModelAdmin):
 
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        show_return = False
+        obj = feedback_form.objects.get(id=object_id)
+        if obj.workflow_node == 0:
+            show_return = False
+        elif sub_can_return(obj, request.user):
+            show_return = True
         self.readonly_fields = ['workflow_node','agreed']
         self.exclude=['project_info']
 
@@ -1886,6 +1933,7 @@ class feedback_formAdmin(admin.ModelAdmin):
         extra_context = extra_context or {}
 
         ctx = dict(
+            show_return = show_return,
             show_save=show_submit_button,
             show_save_and_continue=show_save_and_continue,
             show_save_and_add_another = False,
@@ -1898,9 +1946,13 @@ class feedback_formAdmin(admin.ModelAdmin):
         return super(feedback_formAdmin, self).changeform_view(request, object_id, form_url, extra_context)
 
     def save_model(self, request, obj, form, change):
+        if "_return" in request.POST:
+            TodoList.objects.filter(project=obj.project_info, content_type=7).delete()
+            obj.go_back()
+            return
 
         obj.save()
-        if "_next" in request.POST:
+        if "_confirm" in request.POST:
             to_next(obj, 1, request.user, "提交了自评报告表格", 7)
             self.message_user(request, "提交成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
 
@@ -1909,6 +1961,9 @@ class feedback_formAdmin(admin.ModelAdmin):
         self.message_user(request, "反对成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
 
     def response_change(self, request, obj):
+        if "_return" in request.POST:
+            return HttpResponseRedirect(request.path)
+
         total_self = 0
         total_eva = 0
         for i in feedback_report.objects.filter(feedback_form = obj):
@@ -2029,11 +2084,7 @@ class feedback_reportAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         obj.save()
-        pro = Project.objects.get(id =id)
 
-        if "_confirm" in request.POST:
-            to_next(obj, 1, request.user, "提交了材料领用表格", 4)
-            self.message_user(request, "提交成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
 
     def delete_model(self, request, obj):
         to_next(obj, 2, request.user, "反对了材料领用表格", 4, False)

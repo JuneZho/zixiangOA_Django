@@ -115,7 +115,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-LOGIN_REDIRECT_URL = '/admin/basedata/todolist'
 
 LANGUAGE_CODE = 'zh_hans'
 

@@ -2,7 +2,6 @@
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
 from common import const
-from common import generic
 from users import models as user_models
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
@@ -28,6 +27,18 @@ BRAND_CHOICE = (("Epson",u"爱普生"),("Lenovo",u"联想"))
 UNIT_CHOICE = ((u"个",u"个"),(u"只",u"只"))
 tool = {'普通员工': 0, '总经理': 1, '商务经理': 2, '财务经理': 3, '工程经理': 4, '技术经理': 5, '库管': 6, '营销经理': 7, '行政经理': 8, '技术中心经理': 9,
         '档案室': 10, '商务助理': 11}
+
+
+def create_and_notify(pro, user, content, msg):
+    TodoList.objects.create(project=pro, user=user, content_type=content,
+                            memo=msg)
+    try:
+        pass
+        const.send_ipmsg(user.username)
+        #const.send_wechat(user.username, "新的待办任务: " + pro.name + " " + msg)
+    except Exception:
+        return
+
 
 
 class Worknode(models.Model):
@@ -105,6 +116,7 @@ class Project(models.Model):
     end = models.DateField(_('完工日期'), blank=True, null=True)
     deliver_time = models.CharField(_('收款日期'),max_length=const.DB_CHAR_NAME_40, blank=True, null=True)
     kaipiao = models.BooleanField(_(u"开票"),default=False)
+    reward = models.PositiveIntegerField(verbose_name=u'项目经理奖励',null= True, blank= True,default=0)
     niehe_hour = models.PositiveIntegerField(verbose_name=u'内核工时数',null= True, blank= True,default=0)
     total_hour = models.PositiveIntegerField(verbose_name=u'总工时',null= True, blank= True,default=0)
     hour_cost = models.PositiveIntegerField(verbose_name=u'工时费',null= True, blank= True,default=0)
@@ -128,6 +140,15 @@ class Project(models.Model):
 
 
     workflow_node = models.IntegerField(default=0, verbose_name=u"工作流节点", choices=WORK_FLOW_NODE)
+
+
+    def get_last_user_rank(self):
+        if self.workflow_node == 1:
+            return self.starter
+        elif self.workflow_node == 0:
+            return None
+        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 2][1])
+
     def restart(self):
         self.WORK_FLOW_NODE = get_node(1)
         self.workflow_node = self.WORK_FLOW_NODE[1]
@@ -163,12 +184,11 @@ class Project(models.Model):
                 user = self.manager
             else:
                 user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node-1][1])
-            TodoList.objects.create(project=self, user=user , memo = "总流程  上一节点为 "+self.WORK_FLOW_NODE[self.workflow_node-1][1],content_type=1)
+            create_and_notify(self,user,1,"总流程  上一节点为 "+self.WORK_FLOW_NODE[self.workflow_node-1][1])
             if self.WORK_FLOW_NODE[self.workflow_node-1][1] == '总经理':
                 if len(TodoList.objects.filter(project=self, user=user_models.Employee.objects.get(title=6),
                                         memo="请安排出货", content_type=1)) ==0:
-                    TodoList.objects.create(project=self, user=user_models.Employee.objects.get(title=6),
-                                        memo="请安排出货", content_type=1)
+                    create_and_notify(self, user_models.Employee.objects.get(title=6), 1, "请安排出货")
         else:
             print("已终结或暂挂，无法流程继续")
 
@@ -186,7 +206,8 @@ class Project(models.Model):
 
             else:
                 user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node-1][1])
-            TodoList.objects.create(project=self, user=user , memo = "总流程  由"+self.WORK_FLOW_NODE[self.workflow_node+1][1]+"退回",content_type=1)
+
+            create_and_notify(self,user,1,"总流程  由"+self.WORK_FLOW_NODE[self.workflow_node+1][1]+"退回")
 
 
     def __str__(self):
@@ -314,7 +335,9 @@ class Device_changelog(models.Model):
     def get_last_user_rank(self):
         if self.workflow_node == 1:
             return self.project_info.starter
-        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
+        elif self.workflow_node == 0:
+            return None
+        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 2][1])
 
     def get_starter(self):
         return self.project_info.starter
@@ -325,8 +348,10 @@ class Device_changelog(models.Model):
         if self.workflow_node < len(self.WORK_FLOW_NODE) - 2:
             self.workflow_node += 1
             user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
-            TodoList.objects.create(project=self.project_info, user=user,content_type=3,
-                                    memo="设备更改  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1])
+
+
+            msg = "设备更改  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1]
+            create_and_notify(self.project_info,user,3,msg)
 
 
         elif self.workflow_node == len(self.WORK_FLOW_NODE) - 2:
@@ -336,12 +361,15 @@ class Device_changelog(models.Model):
         self.save()
 
     def go_back(self):
-        if self.workflow_node != 0:
+        if self.workflow_node != 1 and self.workflow_node != 0:
             self.workflow_node -= 1
-        self.save()
+            user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
+        elif self.workflow_node == 1:
+            self.workflow_node -= 1
+            user = self.project_info.starter
 
-        user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node-1][1])
-        TodoList.objects.create(project=self.project_info, user=user , memo = "设备更改  上一节点为 "+self.WORK_FLOW_NODE[self.workflow_node+1][1]+"退回",content_type=3)
+        self.save()
+        create_and_notify(self.project_info, user, 3, "设备更改  上一节点为 "+self.WORK_FLOW_NODE[self.workflow_node+1][1]+"退回")
 
     class Meta:
         verbose_name=u"修改记录"
@@ -416,6 +444,8 @@ class Outsource(models.Model):
 
     project_info = models.OneToOneField(Project, on_delete=models.CASCADE, verbose_name=u"项目名字",blank=True, null=True)
     agreed = models.BooleanField(verbose_name=u"已审批完成", default=False)
+
+    associated_file = models.FileField(_("文件"),upload_to='excel',blank=True,null=True)
     WORK_FLOW_NODE = get_node(2)
 
     workflow_node = models.IntegerField(default=0, verbose_name=u"工作流节点", choices=WORK_FLOW_NODE)
@@ -428,14 +458,20 @@ class Outsource(models.Model):
 
 
     def get_last_user_rank(self):
-        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
+        if self.workflow_node == 1:
+            return user_models.Employee.objects.get(title=4)
+        elif self.workflow_node == 0:
+            return None
+        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 2][1])
 
     def to_next(self):
         if self.workflow_node < len(self.WORK_FLOW_NODE) - 2:
             self.workflow_node += 1
             user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
-            TodoList.objects.create(project=self.project_info, user=user,content_type=2,
-                                    memo="其他费用  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1])
+
+            msg = "其他费用  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1]
+
+            create_and_notify(self.project_info, user, 2,msg)
 
 
         elif self.workflow_node == len(self.WORK_FLOW_NODE) - 2:
@@ -448,13 +484,17 @@ class Outsource(models.Model):
         self.save()
 
     def go_back(self):
-        if self.workflow_node != 0:
+        if self.workflow_node != 1 and self.workflow_node != 0:
             self.workflow_node -= 1
+            user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
+        elif self.workflow_node == 1:
+            self.workflow_node -= 1
+            user = user_models.Employee.objects.get(title=4)
+
         self.save()
 
-        user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
-        TodoList.objects.create(project=self.project_info, user=user, content_type=2,
-                                memo="其他费用  由上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node + 1][1] + "退回")
+        create_and_notify(self.project_info, user, 2,
+                          "其他费用  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node + 1][1] + "退回")
 
     def get_starter(self):
         return user_models.Employee.objects.get(title = 4)
@@ -507,20 +547,23 @@ class Material_log(models.Model):
             return self.project_info.manager
         elif self.workflow_node == 0:
             return None
-        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
+        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 2][1])
 
     def to_next(self):
         if self.workflow_node < len(self.WORK_FLOW_NODE) - 2:
             self.workflow_node += 1
 
             user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
-            TodoList.objects.create(project=self.project_info, user=user,content_type=4,
-                                    memo="材料领用  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1])
+            msg = "材料领用  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1]
+
+            create_and_notify(self.project_info,user,4,msg)
 
 
         elif self.workflow_node == len(self.WORK_FLOW_NODE) - 2:
             self.workflow_node += 1
             self.agreed = True
+
+
 
         self.save()
 
@@ -529,14 +572,14 @@ class Material_log(models.Model):
             self.workflow_node -= 1
             user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
         elif self.workflow_node == 1:
-            print("gogo")
             self.workflow_node -= 1
             user = self.project_info.manager
 
         self.save()
 
-        TodoList.objects.create(project=self.project_info, user=user, content_type=4,
-                                memo="材料领用  由上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node + 1][1]+"退回")
+
+        create_and_notify(self.project_info, user, 4,
+                      "材料领用  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node + 1][1] + "退回")
 
     def back_to(self, node_num):
         if node_num < 3:
@@ -600,7 +643,7 @@ class Device_finalform(models.Model):
     def get_last_user_rank(self):
         if self.workflow_node == 1:
             return self.project_info.manager
-        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
+        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 2][1])
 
     def get_starter(self):
         return self.project_info.manager
@@ -612,8 +655,9 @@ class Device_finalform(models.Model):
             self.workflow_node += 1
 
             user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
-            TodoList.objects.create(project=self.project_info, user=user, content_type=8,
-                                    memo="设备信息  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1])
+            msg = "设备信息  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1]
+
+            create_and_notify(self.project_info,user,8,msg)
 
 
         elif self.workflow_node == len(self.WORK_FLOW_NODE) - 2:
@@ -623,13 +667,17 @@ class Device_finalform(models.Model):
         self.save()
 
     def go_back(self):
-        if self.workflow_node != 0:
+        if self.workflow_node != 1 and self.workflow_node != 0:
             self.workflow_node -= 1
+            user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
+        elif self.workflow_node == 1:
+            self.workflow_node -= 1
+            user = self.project_info.manager
         self.save()
 
-        user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
-        TodoList.objects.create(project=self.project_info, user=user, content_type=8,
-                                memo="设备信息  由上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node + 1][1] + "退回")
+
+        create_and_notify(self.project_info, user, 8,
+                      "设备信息  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node + 1][1] + "退回")
 
     def back(self, node_num):
         if node_num < 3:
@@ -693,15 +741,15 @@ class Finish_report(models.Model):
     def get_last_user_rank(self):
         if self.workflow_node == 1:
             return self.project_info.manager
-        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
+        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 2][1])
 
     def to_next(self):
         if self.workflow_node < len(self.WORK_FLOW_NODE) - 2:
             self.workflow_node += 1
 
             user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
-            TodoList.objects.create(project=self.project_info, user=user, content_type=6,
-                                    memo="竣工报告  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1])
+            msg="竣工报告  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1]
+            create_and_notify(self.project_info,user,6,msg)
 
 
         elif self.workflow_node == len(self.WORK_FLOW_NODE) - 2:
@@ -711,13 +759,16 @@ class Finish_report(models.Model):
         self.save()
 
     def go_back(self):
-        if self.workflow_node != 0:
+        if self.workflow_node != 1 and self.workflow_node != 0:
             self.workflow_node -= 1
+            user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
+        elif self.workflow_node == 1:
+            self.workflow_node -= 1
+            user = self.project_info.manager
         self.save()
 
-        user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
-        TodoList.objects.create(project=self.project_info, user=user, content_type=6,
-                                memo="竣工报告  由上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node + 1][1] + "退回")
+        create_and_notify(self.project_info, user, 6,
+                      "竣工报告  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node + 1][1] + "退回")
 
     def back_to(self, node_num):
         if node_num < 3:
@@ -749,7 +800,7 @@ class work_report(models.Model):
     def get_last_user_rank(self):
         if self.workflow_node == 1:
             return self.project_info.manager
-        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
+        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 2][1])
 
     def get_starter(self):
         return self.project_info.manager
@@ -761,8 +812,8 @@ class work_report(models.Model):
             self.workflow_node += 1
 
             user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
-            TodoList.objects.create(project=self.project_info, user=user, content_type=5,
-                                    memo="工时记录  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1])
+            msg="工时记录  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1]
+            create_and_notify(self.project_info,user,5,msg)
 
 
         elif self.workflow_node == len(self.WORK_FLOW_NODE) - 2:
@@ -772,13 +823,16 @@ class work_report(models.Model):
         self.save()
 
     def go_back(self):
-        if self.workflow_node != 0:
+        if self.workflow_node != 1 and self.workflow_node != 0:
             self.workflow_node -= 1
+            user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
+        elif self.workflow_node == 1:
+            self.workflow_node -= 1
+            user = self.project_info.manager
         self.save()
 
-        user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
-        TodoList.objects.create(project=self.project_info, user=user, content_type=5,
-                                memo="工时记录  由上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node + 1][1] + "退回")
+        create_and_notify(self.project_info, user, 5,
+                      "工时记录  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node + 1][1] + "退回")
 
     def back_to(self, node_num):
         if node_num < 3:
@@ -848,7 +902,7 @@ class feedback_form(models.Model):
     def get_last_user_rank(self):
         if self.workflow_node == 1:
             return self.project_info.manager
-        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
+        return user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 2][1])
 
     def __str__(self):
         return self.project_info.name +"的项目经理考核"
@@ -861,24 +915,28 @@ class feedback_form(models.Model):
             self.workflow_node += 1
 
             user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
-            TodoList.objects.create(project=self.project_info, user=user, content_type=7,
-                                    memo="项目经理考核  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1])
+            msg="项目经理考核  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node - 1][1]
+            create_and_notify(self.project_info,user,7,msg)
 
 
         elif self.workflow_node == len(self.WORK_FLOW_NODE) - 2:
             self.workflow_node += 1
             self.agreed = True
+            self.project_info.reward = self.bonus
+            self.project_info.save()
 
         self.save()
 
     def go_back(self):
-        if self.workflow_node != 0:
+        if self.workflow_node != 1 and self.workflow_node != 0:
             self.workflow_node -= 1
+            user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
+        elif self.workflow_node == 1:
+            self.workflow_node -= 1
+            user = self.project_info.manager
         self.save()
-
-        user = user_models.Employee.objects.get(title=trans(self.WORK_FLOW_NODE)[self.workflow_node - 1][1])
-        TodoList.objects.create(project=self.project_info, user=user, content_type=7,
-                                memo="项目经理考核  由上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node + 1][1] + "退回")
+        create_and_notify(self.project_info, user, 7,
+                      "项目经理考核  上一节点为 " + self.WORK_FLOW_NODE[self.workflow_node + 1][1] + "退回")
 
     def back_to(self, node_num):
         if node_num < 5:
@@ -1017,9 +1075,34 @@ class TodoList(models.Model):
 
     def href(self):
         title = u"链接"
-
-        return format_html("<a href='/admin/basedata/project/{}/change'>{}</a>",
+        if self.content_type == 1:
+            return format_html("<a href='/admin/basedata/project/{}/change'>{}</a>",
                            self.project.id,title)
+        if self.content_type == 2:
+            return format_html("<a href=/outSource/{}>{}</a>",
+                           self.project.id,title)
+        if self.content_type == 3:
+            return format_html("<a href=/devicesChangeInfo/{}>{}</a>",
+                           self.project.id,title)
+        if self.content_type == 4:
+            return format_html("<a href=/StockInfo/{}>{}</a>",
+                           self.project.id,title)
+        if self.content_type == 5:
+            return format_html("<a href=/HRInfo/{}>{}</a>",
+                           self.project.id,title)
+        if self.content_type == 6:
+            return format_html("<a href=/FinalReportInfo/{}>{}</a>",
+                           self.project.id,title)
+        if self.content_type == 7:
+            return format_html("<a href=/EvaluationInfo/{}>{}</a>",
+                           self.project.id,title)
+        if self.content_type == 8:
+            return format_html("<a href=/devicesFinalInfo/{}>{}</a>",
+                           self.project.id,title)
+        return format_html("<a href='/admin/basedata/project/{}/change'>{}</a>",
+                           self.project.id, title)
+
+
 
     def navi_href(self):
         title = self.project.name

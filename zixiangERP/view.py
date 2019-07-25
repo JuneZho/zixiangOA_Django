@@ -13,12 +13,14 @@ ProjID = 0
 
 
 def home(request):
-    return HttpResponseRedirect("/admin/basedata/todolist")
+    return HttpResponseRedirect("/admin/")
 
 def deviceInfo(request,project_id):
 
     if project_id is not None:
         pro = models.Project.objects.get(id = str(project_id))
+        request.user.recent_pro = project_id
+        request.user.save()
     else:
         pro = models.Project.objects.get(id = request.user.recent_pro)
 
@@ -27,12 +29,15 @@ def deviceInfo(request,project_id):
     return HttpResponseRedirect('/admin/basedata/device_form/' + str(fr.id) + '/change')
 
 def deviceChange(request,project_id):
-
+    request.user.recent_pro = project_id
+    request.user.save()
     return HttpResponseRedirect("/admin/basedata/device_changelog")
 
 def deviceFinal(request,project_id):
 
     if project_id is not None:
+        request.user.recent_pro = project_id
+        request.user.save()
         pro = models.Project.objects.get(id = str(project_id))
     else:
         pro = models.Project.objects.get(id = request.user.recent_pro)
@@ -45,6 +50,8 @@ def stock(request,project_id):
 
     if project_id is not None:
         pro = models.Project.objects.get(id = str(project_id))
+        request.user.recent_pro = project_id
+        request.user.save()
     else:
         pro = models.Project.objects.get(id = request.user.recent_pro)
 
@@ -61,6 +68,8 @@ def outItem(request,outSource_id):
 def finalReport(request,project_id):
     if project_id is not None:
         pro = models.Project.objects.get(id = str(project_id))
+        request.user.recent_pro = project_id
+        request.user.save()
     else:
         pro = models.Project.objects.get(id = request.user.recent_pro)
     frs = ContentType.objects.get(app_label='basedata', model='Finish_report')
@@ -72,6 +81,8 @@ def Evalu(request,project_id):
 
     if project_id is not None:
         pro = models.Project.objects.get(id = str(project_id))
+        request.user.recent_pro = project_id
+        request.user.save()
     else:
         pro = models.Project.objects.get(id = request.user.recent_pro)
     frs = ContentType.objects.get(app_label='basedata', model='feedback_form')
@@ -82,6 +93,8 @@ def outSource(request,project_id):
 
     if project_id is not None:
         pro = models.Project.objects.get(id = str(project_id))
+        request.user.recent_pro = project_id
+        request.user.save()
     else:
         pro = models.Project.objects.get(id = request.user.recent_pro)
 
