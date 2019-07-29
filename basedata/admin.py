@@ -7,8 +7,7 @@ from django.http import HttpResponseRedirect
 from zixiangERP.settings import BASE_DIR
 import xlrd
 from django.contrib.admin.templatetags.admin_modify import register, submit_row as original_submit_row
-from django.forms import widgets,FileField,Field,Widget,CharField,TextInput
-from django.forms.utils import flatatt
+from django.forms import widgets,TextInput
 
 from django.contrib.admin import AdminSite
 
@@ -81,6 +80,7 @@ def make_number(objects):
 class ProjectAdmin(admin.ModelAdmin):
     starter = False
     fieldsets = (
+        ("营销执行报告",{'fields':['company']}),
         ("基础信息", {'fields': ['begin', 'starter', 'name', 'contract', 'total_price','kaipiao']}),
         ("客户及付款人信息", {
             'fields': [('cusname', 'cusaddr'), ('recname', 'recaddr'), ('receiver', 'receiverdep'),
@@ -152,18 +152,18 @@ class ProjectAdmin(admin.ModelAdmin):
             return ['workflow_node', 'total_price', 'manager', 'active', 'niehe_hour', 'total_hour', 'total_mat',
                     'total_money','hour_cost','total_out','reward']
         elif request.user.title ==4:
-            return ['active','begin','starter','name','total_price','kaipiao','contract','deliver_time',
-                    'description','associated_file','total_hour','total_mat','total_money','workflow_node','hour_cost','total_out','reward']
+            return ['company','active','begin','starter','name','total_price','kaipiao','contract','deliver_time',
+                    'description','total_hour','total_mat','total_money','workflow_node','hour_cost','total_out','reward']
         elif request.user ==obj.starter:
             self.starter = True
             return ['workflow_node', 'total_price', 'manager', 'active', 'niehe_hour', 'total_hour', 'total_mat',
                     'total_money','hour_cost','total_out','reward']
         elif request.user == obj.manager:
-            return ['active', 'begin', 'starter', 'name', 'total_price', 'kaipiao','deliver_time','manager',
-                    'description', 'associated_file', 'total_hour', 'total_mat', 'total_money','niehe_hour','workflow_node','end','hour_cost','contract','total_out','reward']
+            return ['company','active', 'begin', 'starter', 'name', 'total_price', 'kaipiao','deliver_time','manager',
+                    'description', 'total_hour', 'total_mat', 'total_money','niehe_hour','workflow_node','end','hour_cost','contract','total_out','reward']
         else:
 
-            return  ['active', 'begin', 'starter', 'name',
+            return  ['company','active', 'begin', 'starter', 'name',
                     #'cusname','cusaddr', 'recname', 'recaddr', 'receiver',
                     #'receiverdep', 'receiverphone', 'receivertele',
                     #'payer', 'payerdep', 'payerphone', 'payertele',
@@ -198,7 +198,6 @@ class ProjectAdmin(admin.ModelAdmin):
             curuser = get_edible_user(obj)
 
             if request.user == curuser:
-                show_submit_button = True
                 show_save = True
                 show_save_and_continue = True
 
@@ -211,7 +210,10 @@ class ProjectAdmin(admin.ModelAdmin):
         else:
             show_save_and_continue = False
             show_save = True
-
+        page_back = False
+        if request.user.title == 12:
+            page_back =True
+            show_workflow_line = False
         extra_context = extra_context or {}
         ctx = dict(
             show_return = show_return,
@@ -221,7 +223,8 @@ class ProjectAdmin(admin.ModelAdmin):
             show_save_and_add_another = False,
             show_delete_link = show_save_and_continue,
             show_save = show_save,
-            show_save_and_continue = show_save_and_continue
+            show_save_and_continue = show_save_and_continue,
+            page_back = page_back,
         )
 
         extra_context.update(ctx)
@@ -404,7 +407,7 @@ class OutsourceAdmin(admin.ModelAdmin):
     list_display = ['myname', 'begin_time', 'fuzeren', 'end_time', 'total_price']
 
     def get_readonly_fields(self, request, obj=None):
-        self.fields = ['project_info', 'myname', 'begin_time', 'end_time', 'fuzeren','price', 'total_price','description','associated_file','recom','workflow_node']
+        self.fields = ['project_info', 'myname', 'begin_time', 'end_time', 'fuzeren','price', 'total_price','description','associated_file','recom','workflow_node','agreed']
         if request.user.title ==4:
             return ['total_price','workflow_node','project_info','agreed']
         else:
@@ -691,6 +694,7 @@ class DeviceFormAdmin(admin.ModelAdmin):
             instance_id = pro.id,
             show_back = True,
             obj_id = object_id,
+            type = 0,
             show_out = True,
             show_workflow_line=True
         )
@@ -1114,14 +1118,14 @@ class MaterialInfoInline(admin.TabularInline): # TabularInline
 
     def get_exclude(self, request, obj=None):
         if request.user == Project.objects.get(id = request.user.recent_pro).manager:
-            self.fields = ['material_name','brand','xinhao','guige','num','unit','price','total_price']
-            self.readonly_fields = ['total_price','price']
+            self.fields = ['thisid','material_name','brand','xinhao','guige','num','unit','price','total_price']
+            self.readonly_fields = ['thisid','total_price','price']
         elif request.user.title == 6:
-            self.fields = ['material_name','brand','xinhao','guige','num','unit','price','total_price']
-            self.readonly_fields = ['material_name','brand','guige','xinhao','num','unit','total_price']
+            self.fields = ['thisid','material_name','brand','xinhao','guige','num','unit','price','total_price']
+            self.readonly_fields = ['thisid','material_name','brand','guige','xinhao','num','unit','total_price']
         else:
 
-            self.fields = ['material_name','brand','xinhao','guige','num','unit','price','total_price']
+            self.fields = ['thisid','material_name','brand','xinhao','guige','num','unit','price','total_price']
             self.readonly_fields = self.fields
 
 
@@ -1175,14 +1179,18 @@ class Material_logAdmin(admin.ModelAdmin):
             show_delete_link = show_save_and_continue,
             show_back = True,
             instance_id = request.user.recent_pro,
+            show_out=True,
+            show_workflow_line=True,
 
-            show_workflow_line=True
+            obj_id=obj.id,
+            type=1,
 
         )
         extra_context.update(ctx)
         return super(Material_logAdmin, self).changeform_view(request, object_id, form_url, extra_context)
 
     def save_model(self, request, obj, form, change):
+        import os
 
         if "_return" in request.POST:
             TodoList.objects.filter(project=obj.project_info, content_type=4).delete()
@@ -1201,6 +1209,50 @@ class Material_logAdmin(admin.ModelAdmin):
             to_next(obj,1,request.user,"提交了材料领用表格",4)
             self.message_user(request, "提交成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
 
+        if obj.file != None and obj.file.name != '':
+            workbook = xlrd.open_workbook(os.path.join(BASE_DIR, obj.file.name).replace('\\', '/'))
+            table = workbook.sheets()[0]
+            if True:
+                s = 2
+                try:
+                    for i in range(2, table.nrows):
+                        s += 1
+                        if len(table.row_values(i)) < 5:
+                            break
+                        if table.row_values(i)[1] is not '' and table.row_values(i)[5] is not None:
+                            if len(Material_use.objects.filter(material_log=obj,
+                                                         material_name=table.row_values(i)[1],
+                                                         brand=table.row_values(i)[2],
+                                                         guige=table.row_values(i)[3],
+                                                         xinhao=table.row_values(i)[4],
+                                                         num=table.row_values(i)[5],
+                                                         unit=table.row_values(i)[6]))!=0:
+                                print('exist in the database')
+
+
+
+                            else:
+                                Material_use.objects.create(material_log=obj,
+                                                          material_name=table.row_values(i)[1],
+                                                          brand=table.row_values(i)[2],
+                                                          guige=table.row_values(i)[3],
+                                                          xinhao=table.row_values(i)[4],
+                                                          num=table.row_values(i)[5],
+                                                          unit=table.row_values(i)[6])
+
+                except Exception as e:
+                    self.message_user(request, "失败" + ' 第' + str(s) + '行' + e.__str__(),messages.ERROR)
+                    print("失败" + ' 第' + str(s) + '行' + e.__str__())
+
+            try:
+                os.remove(os.path.join(BASE_DIR, obj.file.name))
+                obj.file = None
+                obj.save()
+            except Exception as e:
+                pass
+
+        self.message_user(request, "成功")
+
     def delete_model(self, request, obj):
         to_next(obj, 2, request.user, "反对了材料领用表格", 4,False)
         self.message_user(request, "反对成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
@@ -1208,7 +1260,10 @@ class Material_logAdmin(admin.ModelAdmin):
     def response_change(self, request, obj):
         ms = Material_use.objects.filter(material_log=obj)
         total = 0
+        i = 1
         for m in ms:
+            m.thisid = i
+            i+=1
             m.save_change()
             total += m.total_price
         obj.total = total
@@ -1221,8 +1276,12 @@ class Material_logAdmin(admin.ModelAdmin):
     def response_add(self, request, obj):
         ms = Material_use.objects.filter(material_log=obj)
         total = 0
+        i = 1
         for m in ms:
+            m.thisid = i
+            i+=1
             m.save_change()
+
             total += m.total_price
         obj.total = total
         obj.save()
@@ -1236,6 +1295,172 @@ class Material_logAdmin(admin.ModelAdmin):
 
 
 admin_site.register(Material_log,Material_logAdmin)
+
+"售后助理追踪所有的设备信息"
+from django.db.models import Q
+
+class InputFilter(admin.SimpleListFilter):
+    template = 'admin/textinput_filter.html'
+
+    def lookups(self, request, model_admin):
+        # Dummy, required to show the filter.
+        return ((),)
+
+    def choices(self, changelist):
+        # Grab only the "all" option.
+        all_choice = next(super().choices(changelist))
+        all_choice['query_parts'] = (
+            (k, v)
+            for k, v in changelist.get_filters_params().items()
+            if k != self.parameter_name
+        )
+        yield all_choice
+class UIDFilter(InputFilter):
+    parameter_name = 'brand'
+    title = '品牌/型号/生产商'
+
+    def queryset(self, request, queryset):
+        if self.value() is not None:
+            uid = self.value()
+
+            return queryset.filter(
+                Q(brand=uid) |
+                Q(type=uid) |
+                Q(producer=uid)
+            )
+
+class DeviceFinalAdmin(admin.ModelAdmin):
+
+    list_display = ['name','proj', 'brand', 'type', 'specification','producer','produce_num','produce_time','place_keep','bill_num','price',
+                               'time_install','record','note']
+
+    fields  = ['name', 'brand', 'type', 'specification','producer','produce_num','produce_time','place_keep','bill_num','price',
+                               'time_install','record','note']
+    readonly_fields = ['name', 'brand', 'type', 'specification','producer','produce_num','produce_time','place_keep','bill_num','price',
+                               'time_install','note']
+    list_editable = ['record']
+
+    formfield_overrides = {
+        models.CharField:{'widget':widgets.TextInput(attrs={'size': 12})},
+        models.IntegerField: {'widget': widgets.TextInput(attrs={'size': 2})},
+        models.DecimalField: {'widget': widgets.TextInput(attrs={'size': 5})},
+        models.TextField: {'widget': widgets.Textarea(attrs={'cols': '20', 'rows': '2'})},
+
+    }
+    search_fields = ['brand','type','specification','producer','name']
+
+    list_filter = (UIDFilter,)
+    def get_actions(self, request):
+        actions =super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+    def changelist_view(self, request, extra_context=None):
+
+        extra_context = extra_context or {}
+        ctx = dict(
+            is_device=True
+
+        )
+        extra_context.update(ctx)
+        return super(DeviceFinalAdmin, self).changelist_view(request, extra_context)
+
+    def export(self,request,queryset):
+
+        from django.http import HttpResponse
+        import xlsxwriter
+        from io import BytesIO
+        out = BytesIO()
+        wb = xlsxwriter.Workbook(out, {'in_memory': True})
+        ws = wb.add_worksheet('设备信息')
+
+        ws.write(0, 0, '设备信息')
+        ws.write(1, 0, '序号')
+        ws.write(1, 1, '设备名称')
+
+        ws.write(1, 2, '项目')
+        ws.write(1, 3, '品牌')
+        ws.write(1, 4, '型号')
+        ws.write(1, 5, '规格')
+        ws.write(1, 6, '生产厂家')
+        ws.write(1, 7, '出厂编号')
+        ws.write(1, 8, '出厂日期')
+        ws.write(1, 9, '存放地点')
+        ws.write(1, 10, '单据号')
+        ws.write(1, 11, '单价')
+        ws.write(1, 12, '安装时期')
+
+        ws.write(1, 13, '维修记录')
+        ws.write(1, 14, '备注')
+        row = 1
+
+        for d in queryset:
+            row += 1
+            ws.write(row, 0, d.thisid)
+            ws.write(row, 1, d.name)
+
+            ws.write(row, 2, str(d.form))
+            ws.write(row, 3, d.brand)
+            ws.write(row, 4, d.type)
+            ws.write(row, 5, d.specification)
+            ws.write(row, 6, d.producer)
+            ws.write(row, 7, d.produce_num)
+            ws.write(row, 8, d.produce_time)
+            ws.write(row, 9, d.place_keep)
+            ws.write(row, 10, d.bill_num)
+            ws.write(row, 11, d.price)
+            ws.write(row, 12, d.time_install)
+            ws.write(row, 13, d.record)
+            ws.write(row, 14, d.note)
+
+        wb.close()
+        out.seek(0)
+        response = HttpResponse(
+            out,
+            content_type='application/octet-stream'
+        )
+        response['Content-Disposition'] = 'attachment;filename=export.xlsx'
+        return response
+
+    export.short_description =  "导出所选"
+    actions = ['export']
+
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+
+        extra_context = extra_context or {}
+        ctx = dict(
+            show_save=True,
+            show_save_and_continue=False,
+            show_save_and_add_another = False,
+            show_delete_link = False,
+            page_back = True
+
+        )
+        extra_context.update(ctx)
+        return super(DeviceFinalAdmin, self).changeform_view(request, object_id, form_url, extra_context)
+
+    def has_add_permission(self, request):
+        try:
+            return request.user == Project.objects.get(id=request.user.recent_pro).manager
+        except Exception:
+            return False
+
+    def has_delete_permission(self, request, obj=None):
+        try:
+            return request.user == Project.objects.get(id=request.user.recent_pro).manager
+        except Exception:
+            return False
+
+
+
+
+
+
+
+
+admin_site.register(Device_final,DeviceFinalAdmin)
+
 
 
 class DeviceFinalInfoInline(admin.TabularInline): # TabularInline
@@ -1264,7 +1489,14 @@ class DeviceFinalInfoInline(admin.TabularInline): # TabularInline
             if request.user == Project.objects.get(id=request.user.recent_pro).manager:
                 self.fields = [ 'name', 'brand', 'type', 'specification','producer','produce_num','produce_time','place_keep','bill_num','price',
                                'time_install','record','note']
-                #self.readonly_fields = ['name', 'brand', 'specification', 'price']
+                self.readonly_fields = ['record']
+            elif request.user == user_models.Employee.objects.get(title = 12):
+                self.fields = ['name', 'brand', 'type', 'specification', 'producer', 'produce_num', 'produce_time',
+                               'place_keep', 'bill_num', 'price',
+                               'time_install', 'record', 'note']
+                self.readonly_fields = ['name', 'brand', 'type', 'specification', 'producer', 'produce_num', 'produce_time',
+                               'place_keep', 'bill_num', 'price',
+                               'time_install', 'note']
             else:
 
                 self.fields = ['name', 'brand', 'type', 'specification','producer','produce_num','produce_time','place_keep','bill_num','price',
@@ -1342,7 +1574,9 @@ class DeviceFinalFormAdmin(admin.ModelAdmin):
             show_delete_link = show_save_and_continue,
             show_back = True,
             instance_id = request.user.recent_pro,
-
+            show_out = True,
+            obj_id=obj.id,
+            type=2,
             show_workflow_line=True
         )
         extra_context.update(ctx)
@@ -1372,10 +1606,10 @@ class DeviceFinalFormAdmin(admin.ModelAdmin):
             to_next(obj, 1, request.user, "提交了设备信息表格", 8)
             self.message_user(request, "提交成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
 
-        elif obj.file != None and obj.file.name !='':
+        if obj.file != None and obj.file.name !='':
             workbook = xlrd.open_workbook(os.path.join(BASE_DIR, obj.file.name).replace('\\','/'))
             table = workbook.sheets()[0]
-            if table.row_values(0)[0] =='设备信息表':
+            if table.row_values(0)[0] =='设备信息':
                 try:
                     for i in range(2,table.nrows):
                         if table.row_values(i)[1] is not '' and table.row_values(i)[2] is not '':
@@ -1443,91 +1677,7 @@ class DeviceFinalFormAdmin(admin.ModelAdmin):
 
 admin_site.register(Device_finalform,DeviceFinalFormAdmin)
 
-class Device_finalAdmin(admin.ModelAdmin):
-    list_display = ['thisid','name', 'brand', 'type', 'specification', 'producer','produce_num','produce_time','place_keep','bill_num', 'price']
-    def get_readonly_fields(self, request, obj=None):
-        return ['agreed','workflow_node']
 
-
-
-    def changelist_view(self, request, extra_context=None):
-        id = request.user.recent_pro
-        pros = ContentType.objects.get(app_label='basedata', model='project')
-
-        if id ==0:
-            self.message_user(request, "请重新获取项目id")
-            return
-
-
-        pro = pros.model_class().objects.get(id=id)
-        if request.user == pro.manager:
-            self.list_editable = ['name', 'brand', 'type', 'specification', 'producer','produce_num','produce_time','place_keep','bill_num', 'price']
-            can_submit = True
-        else:
-            whs = mymodels.Device_final.objects.filter(work_report=work_report.objects.get(project_info_id = request.user.recent_pro))
-            wh = whs[0]
-            if wh.WORK_FLOW_NODE[wh.workflow_node][1] == '完成':
-                over = True
-            else:
-                if wh.WORK_FLOW_NODE[wh.workflow_node][1]!='等待':
-                    next = user_models.Employee.objects.get(title=ROLES.index(wh.WORK_FLOW_NODE[wh.workflow_node][1]))
-                    if request.user == next:
-                        can_submit = True
-        ctx = dict(
-            can_submit=can_submit,
-            type=3,
-            instance_id=id
-        )
-
-        extra_context.update(ctx)
-        return super(Device_finalAdmin, self).changelist_view(request, extra_context)
-
-    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
-
-        show_submit_button = True
-        extra_context = extra_context or {}
-
-        ctx = dict(
-            show_submit_button=show_submit_button,
-            show_save_and_continue = False,
-        )
-
-        extra_context.update(ctx)
-        return super(Device_finalAdmin, self).changeform_view(request, object_id, form_url, extra_context)
-
-    def save_model(self, request, obj, form, change):
-        pro = obj.project_info
-        if request.user == pro.manager:
-            self.message_user(request, "成功")
-            obj.save()
-        else:
-            str = "您无权对该项目  " + pro.name + " 的最终设备文件修改，失败"
-            self.message_user(request, str)
-
-    def delete_model(self, request, obj):
-        pro = obj.project_info
-        if request.user == pro.starter:
-            self.message_user(request, "删除成功")
-            obj.delete()
-        else:
-            str = "您无权对该项目  " + pro.name + " 的最终设备文件修改，失败"
-            self.message_user(request, str)
-
-    def response_change(self, request, obj):
-        if "_addanother" in request.POST:
-            return HttpResponseRedirect('/admin/basedata/device_change/add/')
-        return HttpResponseRedirect('/admin/basedata/project/' + str(obj.project_info.id) + '/change')
-
-    def response_add(self, request, obj):
-        if "_addanother" in request.POST:
-            return HttpResponseRedirect('/admin/basedata/device_change/add/')
-        return HttpResponseRedirect('/admin/basedata/project/' + str(obj.project_info.id) + '/change')
-
-    def response_delete(self, request, obj_display, obj_id):
-        return HttpResponseRedirect('/admin/')
-
-
-admin_site.register(Device_final,Device_finalAdmin)
 
 
 class work_hourinline(admin.TabularInline): # TabularInline
@@ -1546,8 +1696,8 @@ class work_hourinline(admin.TabularInline): # TabularInline
         return request.user == Project.objects.get(id = request.user.recent_pro).manager
 
     def get_exclude(self, request, obj=None):
-        self.fields = ['employee', 'start_time', 'finish_time', 'time', 'work_content', 'inside_work_hour',
-                       'inside_price', 'extra_work_hour'
+        self.fields = ['employee', 'start_time', 'finish_time', 'time', 'work_content', 'inside_work_hour','salary_inside',
+                       'inside_price', 'extra_work_hour','salary_outside'
             , 'extra_price', 'total_price']
         if request.user== Project.objects.get(id = request.user.recent_pro).manager:
             self.readonly_fields = ['extra_price','inside_price','total_price']
@@ -1625,7 +1775,6 @@ class work_recordAdmin(admin.ModelAdmin):
         return super(work_recordAdmin, self).changelist_view(request, extra_context)
     def has_add_permission(self, request):
 
-        #can only add another when all other are agreed
         try:
             return len(TodoList.objects.filter(project=Project.objects.get(id = request.user.recent_pro), content_type=5)) == 0
         except Exception:
@@ -1654,18 +1803,20 @@ class work_recordAdmin(admin.ModelAdmin):
     def response_change(self, request, obj):
 
         total = 0
+        total_price = 0
         dict = {}
         for wh in work_hour.objects.filter(work_report = obj):
             if wh.employee.username not in dict:
                 dict[wh.employee.username] = [0,0,0]
 
             wh.save_change()
+            total_price += wh.total_price
             dict[wh.employee.username][0] += wh.inside_work_hour
             dict[wh.employee.username][1] += wh.extra_work_hour
             dict[wh.employee.username][2] += wh.total_price
             total+=wh.extra_work_hour+wh.inside_work_hour
         obj.project_info.total_hour = total
-        obj.project_info.hour_cost = total*220
+        obj.project_info.hour_cost = total_price
         obj.project_info.updateMoney()
         obj.project_info.save()
         note = '合计 \n'
@@ -1702,7 +1853,7 @@ class work_recordAdmin(admin.ModelAdmin):
         obj.note = note
         obj.save()
 
-        return HttpResponseRedirect('/admin/basedata/work_report')
+        return HttpResponseRedirect('/admin/basedata/work_report/{}/change'.format(obj.id))
 
     def response_delete(self, request, obj_display, obj_id):
         return HttpResponseRedirect('/admin/basedata/work_report')
@@ -1904,7 +2055,7 @@ class feedback_formAdmin(admin.ModelAdmin):
     inlines = [FFInfoInline]
 
     def get_readonly_fields(self, request, obj=None):
-        if request.user.title == 1:
+        if request.user.title != 0:
             return ['workflow_node','agreed','project_info','total_point', 'total_self']
         return ['workflow_node','agreed','project_info','total_point','total_self','bonus']
 
@@ -1951,10 +2102,6 @@ class feedback_formAdmin(admin.ModelAdmin):
             obj.go_back()
             return
 
-        obj.save()
-        if "_confirm" in request.POST:
-            to_next(obj, 1, request.user, "提交了自评报告表格", 7)
-            self.message_user(request, "提交成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
 
     def delete_model(self, request, obj):
         to_next(obj, 2, request.user, "反对了自评报告表格", 7, False)
@@ -1969,9 +2116,18 @@ class feedback_formAdmin(admin.ModelAdmin):
         for i in feedback_report.objects.filter(feedback_form = obj):
             total_self += i.self_eva
             total_eva += i.eva
+            if i.self_eva > i.points or i.eva > i.points:
+                self.message_user(request, "错误，评分大于分值",messages.ERROR)
+                return HttpResponseRedirect(request.path)
         obj.total_self = total_self
         obj.total_point =total_eva
         obj.save()
+
+
+        if "_confirm" in request.POST:
+            to_next(obj, 1, request.user, "提交了自评报告表格", 7)
+            self.message_user(request, "提交成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
+
         return HttpResponseRedirect(request.path)
 
     def response_add(self, request, obj):
@@ -1981,10 +2137,20 @@ class feedback_formAdmin(admin.ModelAdmin):
         for i in feedback_report.objects.filter(feedback_form = obj):
             total_self += i.self_eva
             total_eva += i.eva
+
+            if i.self_eva > i.points or i.eva > i.points:
+                self.message_user(request, "错误，评分大于分值",messages.ERROR)
+                return HttpResponseRedirect('/admin/basedata/feedback_form/{}/change'.format(obj.id))
         obj.total_self = total_self
         obj.total_point =total_eva
         obj.save()
-        return HttpResponseRedirect(request.path)
+
+
+        if "_confirm" in request.POST:
+            to_next(obj, 1, request.user, "提交了自评报告表格", 7)
+            self.message_user(request, "提交成功，进入下一工作流 " + obj.WORK_FLOW_NODE[obj.workflow_node][1])
+
+        return HttpResponseRedirect('/admin/basedata/feedback_form/{}/change'.format(obj.id))
 
     def response_delete(self, request, obj_display, obj_id):
         return HttpResponseRedirect('/admin/')
